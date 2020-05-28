@@ -15,15 +15,31 @@ const size_t inWidth = 300;
 const size_t inHeight = 300;
 const double inScaleFactor = 1.0;
 const float confidenceThreshold = 0.7;
-const cv::Scalar meanVal(104.0, 177.0, 123.0);
 
+#if 1
+#   define USE_MODEL_FROM_2020_MAY_25
+#endif
+
+#ifdef USE_MODEL_FROM_2020_MAY_25
+const cv::Scalar meanVal(0, 0, 0);
+#else
+const cv::Scalar meanVal(104.0, 177.0, 123.0);
+#endif
+
+#if 0
 #define CAFFE
+#endif
 
 const std::string caffeConfigFile = "./models/deploy.prototxt";
 const std::string caffeWeightFile = "./models/res10_300x300_ssd_iter_140000_fp16.caffemodel";
 
+#ifdef USE_MODEL_FROM_2020_MAY_25
+const std::string tensorflowConfigFile = "./models/2020-05-25/ssd300_thermal_face_detection_v1.pbtxt";
+const std::string tensorflowWeightFile = "./models/2020-05-25/ssd300_thermal_face_detection_v1.pb";
+#else
 const std::string tensorflowConfigFile = "./models/opencv_face_detector.pbtxt";
 const std::string tensorflowWeightFile = "./models/opencv_face_detector_uint8.pb";
+#endif
 
 void detectFaceOpenCVDNN(Net net, Mat &frameOpenCVDNN)
 {
@@ -65,6 +81,8 @@ int main( int argc, const char** argv )
 #else
   Net net = cv::dnn::readNetFromTensorflow(tensorflowWeightFile, tensorflowConfigFile);
 #endif
+
+  net.setPreferableTarget( cv::dnn::DNN_TARGET_OPENCL );
 
   VideoCapture source;
   if (argc == 1)
