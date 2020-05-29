@@ -51,7 +51,12 @@ void detectFaceOpenCVDNN(Net net, Mat &frameOpenCVDNN)
         cv::Mat inputBlob = cv::dnn::blobFromImage(frameOpenCVDNN, inScaleFactor, cv::Size(inWidth, inHeight), meanVal, true, false);
 #endif
 
+#ifdef USE_MODEL_FROM_2020_MAY_25
+    net.setInput(inputBlob, "image_tensor");
+#else
     net.setInput(inputBlob, "data");
+#endif
+    
     cv::Mat detection = net.forward("detection_out");
 
     cv::Mat detectionMat(detection.size[2], detection.size[3], CV_32F, detection.ptr<float>());
