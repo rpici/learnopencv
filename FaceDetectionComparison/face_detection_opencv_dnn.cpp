@@ -1,6 +1,12 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <exception>
+#include <stdexcept>
+#include <sstream>
+#include <filesystem>
+#include <algorithm> //std::all_of
+#include <cctype> //std::isdigit
 #include <stdlib.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -78,9 +84,78 @@ void detectFaceOpenCVDNN(Net net, Mat &frameOpenCVDNN)
 
 }
 
-
-int main( int argc, const char** argv )
+class BadCommandLineArgs : public invalid_argument
 {
+public:
+  BadCommandLineArgs( const string& msg )
+    : invalid_argument{ msg }
+  {}
+};
+
+bool isAllDigits( const string& s )
+{
+  return all_of(
+    begin( s ),
+    end( s ),
+    []( const auto c ) {
+      return isdigit( c );
+    }
+  );
+}
+
+bool isANonNegativeInteger( const string& s )
+{
+  return isAllDigits( s );
+}
+
+bool isAVidCapDeviceId( const string& s )
+{
+  return isANonNegativeInteger( s );
+}
+
+bool isNotAVidCapDeviceId( const string& s )
+{
+  return ! isAVidCapDeviceId( s );
+}
+
+void validateArgs( const int argc, const char** argv )
+{
+  if ( argc == 1 ) return;
+
+  if ( argc > 2 )
+  {
+    ostringstream ss;
+    ss << "Too many command line arguments.";
+    throw BadCommandLineArgs{ ss.str() };
+  }
+  if ( isNotAVidCapDeviceId( argv[ 1 ] ) )
+  {
+    ostringstream ss;
+    ss << argv[ 1 ] << " isn't a valid video capture device ID.";
+    throw BadCommandLineArgs{ ss.str() };
+  }
+}
+
+VideoCapture makeVideoCaptureSource( const int argc, const char** argv )
+{
+  VideoCapture source;
+
+  const auto deviceId = argc == 1 ? 0 : stoi( argv[1] );
+
+  const auto successfullyOpened = source.open( deviceId );
+
+  if ( ! successfullyOpened )
+  {
+      ostringstream ss;
+      ss << "failed to open device with ID " << deviceId << ".";
+      throw BadCommandLineArgs{ ss.str() };
+  }
+  return source;
+}
+
+void main_( const int argc, const char** argv )
+{
+  validateArgs( argc, argv );
 #ifdef CAFFE
   Net net = cv::dnn::readNetFromCaffe(caffeConfigFile, caffeWeightFile);
 #else
@@ -89,11 +164,8 @@ int main( int argc, const char** argv )
 
   net.setPreferableTarget( cv::dnn::DNN_TARGET_OPENCL );
 
-  VideoCapture source;
-  if (argc == 1)
-      source.open(0);
-  else
-      source.open(argv[1]);
+  auto source = makeVideoCaptureSource( argc, argv );
+  
   Mat frame;
 
   double tt_opencvDNN = 0;
@@ -116,4 +188,67 @@ int main( int argc, const char** argv )
         break;
       }
     }
+}
+
+string getFilenamePartOfPath( const string& somePath )
+{
+  return std::filesystem::path{ somePath }.filename().string();
+}
+
+void usage( const string& fullPathToExecutable )
+{
+  const auto executableName = getFilenamePartOfPath( fullPathToExecutable );
+  constexpr auto dotSlash = "./";
+  cout << "Usage:\n";
+  cout << "\n";
+  cout << "  " << dotSlash << executableName << " [device_ID]\n";
+  cout << "\n";
+  cout << "    where device_ID is the numeric device ID of the video capturing device to use.  This arg is optional.  If no arg is provided, device ID of 0 is used.\n";
+  cout << "\n";
+  cout << "Examples:\n";
+  cout << "\n";
+  cout << " Use the first camera implicitly:\n";
+  cout << "\n";
+  cout << "  " << dotSlash << executableName << "\n";
+  cout << "\n";
+  cout << " Use the first camera explicitly (device IDs are 0-indexed):\n";
+  cout << "\n";
+  cout << "  " << dotSlash << executableName << " 0\n";
+  cout << "\n";
+  cout << " Use the second camera (device IDs are 0-indexed):\n";
+  cout << "\n";
+  cout << "  " << dotSlash << executableName << " 1\n";
+  cout << "\n";
+  cout << " Use the third camera (device IDs are 0-indexed):\n";
+  cout << "\n";
+  cout << "  " << dotSlash << executableName << " 2\n";
+  cout << "\n";
+}
+
+int main( int argc, const char** argv )
+{
+  try
+  {
+      main_( argc, argv );
+      cout << "\nEnd of program.\n\n";
+      return 0;
+  }
+  catch ( const BadCommandLineArgs& e )
+  {
+      cerr << "\n";
+      cerr << __func__ << ": error: " << e.what() << "\n";
+      cerr << "\n";
+      usage( argv[ 0 ] );
+  }
+  catch ( const exception& e )
+  {
+      cerr << "\n";
+      cerr << __func__ << ": error: " << e.what() << "\n";
+  }
+  catch ( ... )
+  {
+      cerr << "\n";
+      cerr << __func__ << ": error, unknown exception caught.\n";
+  }
+  return -1;
 }
