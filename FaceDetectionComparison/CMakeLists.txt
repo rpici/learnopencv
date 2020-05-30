@@ -18,3 +18,5 @@ add_example(face_detection_opencv_dnn)
 add_example(face_detection_dlib_hog)
 add_example(face_detection_dlib_mmod)
 add_example(run-all)
+
+target_compile_features(face_detection_opencv_dnn PRIVATE cxx_std_17)
