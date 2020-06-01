@@ -153,6 +153,41 @@ VideoCapture makeVideoCaptureSource( const int argc, const char** argv )
   return source;
 }
 
+namespace
+{
+  string getCvMatDepthAndDataTypeAsString( const int cvMatType )
+  {
+    //https://stackoverflow.com/questions/10167534/how-to-find-out-what-type-of-a-mat-object-is-with-mattype-in-opencv/17820615#17820615
+    const uchar depthAndDataType = cvMatType & CV_MAT_DEPTH_MASK;
+
+    switch ( depthAndDataType )
+    {
+      case CV_8U:  return "8U";
+      case CV_8S:  return "8S";
+      case CV_16U: return "16U";
+      case CV_16S: return "16S";
+      case CV_32S: return "32S";
+      case CV_32F: return "32F";
+      case CV_64F: return "64F";
+      default:     return "User";
+    }
+  }
+
+  int getNumChannels( const int cvMatType )
+  {
+        //https://stackoverflow.com/questions/10167534/how-to-find-out-what-type-of-a-mat-object-is-with-mattype-in-opencv/17820615#17820615
+    return 1 + ( cvMatType >> CV_CN_SHIFT );
+  }
+} //namespace
+
+string cvMatTypeToString( const int cvMatType )
+{
+    const auto depthAndDataTypeAsString = getCvMatDepthAndDataTypeAsString( cvMatType );
+    const auto numChannels = getNumChannels( cvMatType );
+    
+    return depthAndDataTypeAsString + "C" + std::to_string( numChannels );
+}
+
 void main_( const int argc, const char** argv )
 {
   validateArgs( argc, argv );
@@ -170,11 +205,18 @@ void main_( const int argc, const char** argv )
 
   double tt_opencvDNN = 0;
   double fpsOpencvDNN = 0;
+  bool matTypeWasPrintedOnce = false;
   while(1)
   {
       source >> frame;
       if(frame.empty())
           break;
+
+      if ( ! matTypeWasPrintedOnce )
+      {
+        cout << "cv::Mat type = " << cvMatTypeToString( frame.type() ) << "\n";
+        matTypeWasPrintedOnce = true;
+      }
       double t = cv::getTickCount();
       detectFaceOpenCVDNN ( net, frame );
       tt_opencvDNN = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
