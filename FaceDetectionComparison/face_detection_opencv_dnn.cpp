@@ -7,6 +7,9 @@
 #include <filesystem>
 #include <algorithm> //std::all_of
 #include <cctype> //std::isdigit
+#include <iomanip> //std::put_time
+#include <chrono>
+#include <ctime> //std::time, localtime_r, localtime_s
 #include <stdlib.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -188,6 +191,28 @@ string cvMatTypeToString( const int cvMatType )
     return depthAndDataTypeAsString + "C" + std::to_string( numChannels );
 }
 
+string getCurrentDateTimeAsString()
+{
+    const auto now = std::chrono::system_clock::now();
+
+    const auto now_time_t = std::chrono::system_clock::to_time_t(now);
+
+    tm now_tm{};
+
+#ifdef _WIN32
+    localtime_s( &now_tm, &now_time_t );
+#else
+    localtime_r( &now_time_t, &now_tm );
+#endif
+
+    // https://en.cppreference.com/w/cpp/io/manip/put_time
+    constexpr auto format_str = "%a %d %b %Y %I:%M:%S %p %Z";
+
+    ostringstream ss;
+    ss << put_time( &now_tm, format_str );
+    return ss.str();
+}
+
 void main_( const int argc, const char** argv )
 {
   validateArgs( argc, argv );
@@ -196,6 +221,8 @@ void main_( const int argc, const char** argv )
 #else
   Net net = cv::dnn::readNetFromTensorflow(tensorflowWeightFile, tensorflowConfigFile);
 #endif
+
+  cout << "Program start time: " << getCurrentDateTimeAsString() << "\n";
 
   net.setPreferableTarget( cv::dnn::DNN_TARGET_OPENCL );
 
